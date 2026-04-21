@@ -1,0 +1,551 @@
+const PropertyListing = require("../models/propertyListingmodel.js");
+const fs = require("fs");
+const path = require("path");
+const {
+  deleteFromCloudinary,
+  deleteMultipleFromCloudinary,
+  logger,
+} = require("../utils/cloudinary.js");
+
+const controllerContext = "PROPERTY_CONTROLLER";
+
+/* ================== HELPERS ================== */
+const parseArray = (value) =>
+  value ? value.split(",").map((i) => i.trim()) : [];
+
+/**
+ * Extract uploaded file paths from request
+ */
+const extractUploadedFiles = (req) => {
+  const images = [];
+  const brochure = null;
+
+  // Handle multiple image uploads
+  if (req.files?.propertyImages && Array.isArray(req.files.propertyImages)) {
+    req.files.propertyImages.forEach((file) => {
+      if (file.path || file.secure_url) {
+        images.push(file.path || file.secure_url);
+      }
+    });
+  }
+
+  // Handle brochure upload
+  let brochureFile = null;
+  if (req.files?.propertyBrochure?.[0]) {
+    brochureFile =
+      req.files.propertyBrochure[0].path ||
+      req.files.propertyBrochure[0].secure_url ||
+      null;
+  }
+
+  logger.debug(controllerContext, "Extracted uploaded files", {
+    imageCount: images.length,
+    hasBrochure: !!brochureFile,
+  });
+
+  return { images, brochure: brochureFile };
+};
+
+/**
+ * ================== ADD PROPERTY ==================
+ */
+exports.addProperty = async (req, res) => {
+  const context = `${controllerContext}_ADD_PROPERTY`;
+
+  try {
+    logger.info(context, "Starting property creation");
+
+    const { images, brochure } = extractUploadedFiles(req);
+
+    if (images.length === 0) {
+      logger.warn(context, "No property images provided");
+      return res.status(400).json({
+        success: false,
+        message: "At least one property image is required",
+      });
+    }
+
+    /* 🔥 REQUIRED FIELD VALIDATION */
+    const requiredFields = [
+      "propertyName",
+      "slug",
+      "propertyType",
+      "address",
+      "propertyDetails",
+      "price",
+    ];
+
+    const missingFields = requiredFields.filter(
+      (field) => !req.body[field] || !req.body[field].toString().trim(),
+    );
+
+    if (missingFields.length > 0) {
+      logger.warn(context, "Missing required fields", { missingFields });
+      return res.status(400).json({
+        success: false,
+        message: `Missing required fields: ${missingFields.join(", ")}`,
+        missingFields,
+      });
+    }
+
+    /* 🔥 AUTO-GENERATE SLUG IF NOT PROVIDED */
+    let slug = req.body.slug?.trim();
+
+    if (!slug) {
+      slug = req.body.propertyName
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9\s-]/g, "")
+        .replace(/\s+/g, "-")
+        .replace(/-+/g, "-");
+
+      logger.debug(context, "Auto-generated slug", { slug });
+    }
+
+    const baseSlug = slug;
+    let counter = 1;
+
+    // Ensure slug uniqueness
+    while (await PropertyListing.exists({ slug })) {
+      slug = `${baseSlug}-${counter++}`;
+      logger.debug(context, "Slug already exists, trying new slug", { slug });
+    }
+
+    /* 🔥 PREPARE PROPERTY DATA */
+    const propertyData = {
+      ...req.body,
+      slug,
+
+      /* NUMBERS */
+      price: Number(req.body.price),
+      bedroom: Number(req.body.bedroom || 0),
+      bathroom: Number(req.body.bathroom || 0),
+      sizeSqft: req.body.sizeSqft?.trim() || "",
+
+      /* ARRAYS */
+      highlights: parseArray(req.body.highlights),
+      featuresAmenities: parseArray(req.body.featuresAmenities),
+      nearby: parseArray(req.body.nearby),
+      extraHighlights: parseArray(req.body.extraHighlights),
+
+      /* MEDIA / LINKS */
+      videoLink: req.body.videoLink?.trim() || null,
+      googleMapUrl: req.body.googleMapUrl?.trim() || null,
+
+      /* UPLOADS */
+      propertyImages: images,
+      propertyBrochure: brochure,
+    };
+
+    const property = await PropertyListing.create(propertyData);
+
+    logger.info(context, "Property created successfully", {
+      propertyId: property._id,
+      imageCount: images.length,
+      hasBrochure: !!brochure,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Property added successfully",
+      data: property,
+    });
+  } catch (error) {
+    logger.error(context, "Error creating property", error);
+
+    res.status(400).json({
+      success: false,
+      message: error.message,
+      error: process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
+  }
+};
+
+/**
+ * ================== GET ALL PROPERTIES (WITH FILTERS) ==================
+ */
+exports.getProperties = async (req, res) => {
+  const context = `${controllerContext}_GET_PROPERTIES`;
+
+  try {
+    const {
+      listingType,
+      propertyType,
+      bedroom,
+      bathroom,
+      subArea,
+      minSqft,
+      maxSqft,
+      minPrice,
+      maxPrice,
+      status,
+      developerName,
+    } = req.query;
+
+    const filter = {};
+
+    if (listingType) filter.listingType = listingType;
+    if (propertyType) filter.propertyType = propertyType;
+    if (developerName) filter.developerName = developerName;
+    if (bedroom) filter.bedroom = Number(bedroom);
+    if (bathroom) filter.bathroom = Number(bathroom);
+    if (subArea) filter.subArea = subArea;
+    if (status !== undefined) filter.status = status === "true";
+
+    /* PRICE FILTER */
+    if (minPrice || maxPrice) {
+      filter.price = {};
+      if (minPrice) filter.price.$gte = Number(minPrice);
+      if (maxPrice) filter.price.$lte = Number(maxPrice);
+    }
+
+    /* SIZE FILTER */
+    if (minSqft || maxSqft) {
+      filter.sizeSqft = {};
+      if (minSqft) filter.sizeSqft.$gte = Number(minSqft);
+      if (maxSqft) filter.sizeSqft.$lte = Number(maxSqft);
+    }
+
+    logger.debug(context, "Fetching properties with filter", { filter });
+
+    const properties = await PropertyListing.find(filter).sort({
+      createdAt: -1,
+    });
+
+    logger.info(context, "Properties fetched successfully", {
+      count: properties.length,
+    });
+
+    res.status(200).json({
+      success: true,
+      count: properties.length,
+      data: properties,
+    });
+  } catch (error) {
+    logger.error(context, "Error fetching properties", error);
+
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      error: process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
+  }
+};
+
+/**
+ * ================== GET SINGLE PROPERTY (ID OR SLUG) ==================
+ */
+exports.getSingleProperty = async (req, res) => {
+  const context = `${controllerContext}_GET_SINGLE_PROPERTY`;
+
+  try {
+    const { idOrSlug } = req.params;
+
+    logger.debug(context, "Fetching property", { idOrSlug });
+
+    let property;
+
+    if (idOrSlug.match(/^[0-9a-fA-F]{24}$/)) {
+      // Valid Mongo ObjectId
+      property = await PropertyListing.findById(idOrSlug);
+    } else {
+      // Slug
+      property = await PropertyListing.findOne({ slug: idOrSlug });
+    }
+
+    if (!property) {
+      logger.warn(context, "Property not found", { idOrSlug });
+      return res.status(404).json({
+        success: false,
+        message: "Property not found",
+      });
+    }
+
+    logger.info(context, "Property fetched successfully", {
+      propertyId: property._id,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: property,
+    });
+  } catch (error) {
+    logger.error(context, "Error fetching property", error);
+
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      error: process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
+  }
+};
+
+/**
+ * ================== UPDATE PROPERTY ==================
+ */
+exports.updateProperty = async (req, res) => {
+  const context = `${controllerContext}_UPDATE_PROPERTY`;
+
+  try {
+    const { id } = req.params;
+
+    logger.info(context, "Starting property update", { propertyId: id });
+
+    const property = await PropertyListing.findById(id);
+
+    if (!property) {
+      logger.warn(context, "Property not found", { propertyId: id });
+      return res.status(404).json({
+        success: false,
+        message: "Property not found",
+      });
+    }
+
+    /* 🔥 AUTO SLUG UPDATE */
+    let slug = req.body.slug?.trim();
+
+    if (!slug && req.body.propertyName) {
+      slug = req.body.propertyName
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9\s-]/g, "")
+        .replace(/\s+/g, "-")
+        .replace(/-+/g, "-");
+
+      logger.debug(context, "Auto-generated new slug", { slug });
+    }
+
+    /* 🔥 PREPARE UPDATE DATA */
+    const updateData = {
+      ...req.body,
+      slug,
+      price: req.body.price && Number(req.body.price),
+      bedroom: req.body.bedroom && Number(req.body.bedroom),
+      bathroom: req.body.bathroom && Number(req.body.bathroom),
+      sizeSqft: req.body.sizeSqft && req.body.sizeSqft.trim(),
+      videoLink: req.body.videoLink?.trim() || null,
+      googleMapUrl: req.body.googleMapUrl?.trim() || null,
+    };
+
+    /* ARRAY UPDATES */
+    if (req.body.highlights)
+      updateData.highlights = parseArray(req.body.highlights);
+    if (req.body.featuresAmenities)
+      updateData.featuresAmenities = parseArray(req.body.featuresAmenities);
+    if (req.body.nearby) updateData.nearby = parseArray(req.body.nearby);
+    if (req.body.extraHighlights)
+      updateData.extraHighlights = parseArray(req.body.extraHighlights);
+
+    /* 🔥 IMAGE REPLACE - Delete old images and upload new ones */
+    if (req.files?.propertyImages?.length > 0) {
+      logger.info(context, "Replacing property images", {
+        oldImageCount: property.propertyImages.length,
+        newImageCount: req.files.propertyImages.length,
+      });
+
+      // Delete old images from Cloudinary
+      if (property.propertyImages && property.propertyImages.length > 0) {
+        const deleteResult = await deleteMultipleFromCloudinary(
+          property.propertyImages,
+        );
+        logger.info(context, "Old images deleted", {
+          deleted: deleteResult.deleted.length,
+          failed: deleteResult.failed.length,
+        });
+      }
+
+      // Extract new image URLs
+      const newImages = req.files.propertyImages
+        .map((file) => file.path || file.secure_url)
+        .filter(Boolean);
+
+      updateData.propertyImages = newImages;
+
+      logger.debug(context, "Images updated", { count: newImages.length });
+    }
+
+    /* 🔥 BROCHURE REPLACE - Delete old brochure and upload new one */
+    if (req.files?.propertyBrochure?.[0]) {
+      logger.info(context, "Replacing property brochure");
+
+      // Delete old brochure from Cloudinary
+      if (property.propertyBrochure) {
+        try {
+          await deleteFromCloudinary(property.propertyBrochure);
+          logger.info(context, "Old brochure deleted");
+        } catch (delErr) {
+          logger.warn(
+            context,
+            "Failed to delete old brochure, continuing anyway",
+            delErr,
+          );
+        }
+      }
+
+      // Set new brochure URL
+      const newBrochure =
+        req.files.propertyBrochure[0].path ||
+        req.files.propertyBrochure[0].secure_url;
+      updateData.propertyBrochure = newBrochure;
+
+      logger.debug(context, "Brochure updated");
+    }
+
+    /* 🔥 SAVE UPDATES */
+    const updatedProperty = await PropertyListing.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true },
+    );
+
+    logger.info(context, "Property updated successfully", {
+      propertyId: updatedProperty._id,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Property updated successfully",
+      data: updatedProperty,
+    });
+  } catch (error) {
+    logger.error(context, "Error updating property", error);
+
+    res.status(400).json({
+      success: false,
+      message: error.message,
+      error: process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
+  }
+};
+
+/**
+ * ================== UPDATE STATUS ==================
+ */
+exports.updatePropertyStatus = async (req, res) => {
+  const context = `${controllerContext}_UPDATE_STATUS`;
+
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (typeof status !== "boolean") {
+      logger.warn(context, "Invalid status value", { status });
+      return res.status(400).json({
+        success: false,
+        message: "Status must be a boolean",
+      });
+    }
+
+    logger.info(context, "Updating property status", {
+      propertyId: id,
+      status,
+    });
+
+    const property = await PropertyListing.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true },
+    );
+
+    if (!property) {
+      logger.warn(context, "Property not found", { propertyId: id });
+      return res.status(404).json({
+        success: false,
+        message: "Property not found",
+      });
+    }
+
+    logger.info(context, "Property status updated successfully", {
+      propertyId: property._id,
+      status: property.status,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Status updated successfully",
+      data: property,
+    });
+  } catch (error) {
+    logger.error(context, "Error updating status", error);
+
+    res.status(400).json({
+      success: false,
+      message: error.message,
+      error: process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
+  }
+};
+
+/**
+ * ================== DELETE PROPERTY ==================
+ */
+exports.deleteProperty = async (req, res) => {
+  const context = `${controllerContext}_DELETE_PROPERTY`;
+
+  try {
+    const { id } = req.params;
+
+    logger.info(context, "Starting property deletion", { propertyId: id });
+
+    const property = await PropertyListing.findById(id);
+
+    if (!property) {
+      logger.warn(context, "Property not found", { propertyId: id });
+      return res.status(404).json({
+        success: false,
+        message: "Property not found",
+      });
+    }
+
+    /* 🔥 DELETE ALL ASSOCIATED FILES FROM CLOUDINARY */
+    const filesToDelete = [];
+
+    // Collect all images
+    if (property.propertyImages && property.propertyImages.length > 0) {
+      filesToDelete.push(...property.propertyImages);
+    }
+
+    // Collect brochure
+    if (property.propertyBrochure) {
+      filesToDelete.push(property.propertyBrochure);
+    }
+
+    // Delete all files from Cloudinary
+    if (filesToDelete.length > 0) {
+      logger.info(context, "Deleting files from Cloudinary", {
+        fileCount: filesToDelete.length,
+      });
+
+      const deleteResult = await deleteMultipleFromCloudinary(filesToDelete);
+
+      logger.info(context, "Files deletion completed", {
+        deleted: deleteResult.deleted.length,
+        failed: deleteResult.failed.length,
+      });
+
+      if (deleteResult.failed.length > 0) {
+        logger.warn(context, "Some files failed to delete", {
+          failed: deleteResult.failed,
+        });
+      }
+    }
+
+    /* 🔥 DELETE FROM DATABASE */
+    await PropertyListing.findByIdAndDelete(id);
+
+    logger.info(context, "Property deleted successfully", { propertyId: id });
+
+    res.status(200).json({
+      success: true,
+      message: "Property and all associated files deleted successfully",
+    });
+  } catch (error) {
+    logger.error(context, "Error deleting property", error);
+
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      error: process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
+  }
+};
