@@ -20,9 +20,9 @@ const ensureDir = (dir) => {
 };
 
 // Ensure local backup directories exist (for development)
-ensureDir("uploads/images");
-ensureDir("uploads/brochures");
-ensureDir("uploads/blogs");
+ensureDir("FAR/images");
+ensureDir("FAR/brochures");
+ensureDir("FAR/blogs");
 
 /**
  * ============================================
@@ -144,7 +144,7 @@ const createFileFilter = (allowedTypes = ["image"]) => {
 const createLocalStorage = (destination = "images") => {
   return {
     destination: (req, file, cb) => {
-      const dir = `uploads/${destination}`;
+      const dir = `FAR/${destination}`;
       ensureDir(dir);
       cb(null, dir);
     },
@@ -161,64 +161,114 @@ const createLocalStorage = (destination = "images") => {
  * CLOUDINARY STORAGE
  * ============================================
  */
-const createCloudinaryStorage = (folder = "uploads/images") => {
-  return new CloudinaryStorage({
+const createCloudinaryStorage = (folder = "FAR/images") => {
+  const storage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: async (req, file) => {
       const context = `${uploadContext}_CLOUDINARY`;
-      const ext = path.extname(file.originalname).toLowerCase();
 
-      // PDF handling
-      if (
-        file.fieldname === "propertyBrochure" ||
-        file.fieldname === "brochure"
-      ) {
-        const cleanName = file.originalname
+      try {
+        const ext = path.extname(file.originalname).toLowerCase();
+
+        // PDF handling
+        if (
+          file.fieldname === "propertyBrochure" ||
+          file.fieldname === "brochure"
+        ) {
+          const cleanName = file.originalname
+            .replace(/\s+/g, "_")
+            .split(".")[0];
+
+          logger.info(context, "Uploading PDF to Cloudinary", {
+            fieldname: file.fieldname,
+            cleanName,
+          });
+
+          const params = {
+            folder: "FAR/properties/brochures",
+            resource_type: "raw", // IMPORTANT for pdf
+            type: "upload",
+            format: "pdf",
+            access_mode: "public",
+            public_id: `brochure_${cleanName}_${Date.now()}`,
+          };
+
+          logger.info(context, "PDF params generated", params);
+          return params;
+        }
+
+        // Image handling
+        const imageCleanName = file.originalname
           .replace(/\s+/g, "_")
           .replace(/\.[^/.]+$/, "");
 
-        logger.info(context, "Uploading PDF to Cloudinary", {
+        logger.info(context, "Uploading image to Cloudinary", {
           fieldname: file.fieldname,
-          cleanName,
+          originalname: file.originalname,
         });
 
-        return {
+        const params = {
           folder: folder,
-          resource_type: "raw",
-          type: "upload",
-          format: "pdf",
-          access_mode: "public",
-          flags: "immutable",
-          public_id: `${cleanName}_${Date.now()}`,
+          resource_type: "image",
+          public_id: `${imageCleanName}_${Date.now()}`,
+          allowed_formats: [
+            "jpg",
+            "jpeg",
+            "png",
+            "gif",
+            "webp",
+            "svg",
+            "avif",
+            "bmp",
+            "tiff",
+          ],
         };
+
+        logger.info(context, "Image params generated", params);
+        return params;
+      } catch (error) {
+        const context = `${uploadContext}_CLOUDINARY_PARAMS`;
+        logger.error(context, "Error in params function", error);
+        throw error;
       }
-
-      // Image handling
-      logger.info(context, "Uploading image to Cloudinary", {
-        fieldname: file.fieldname,
-        originalname: file.originalname,
-      });
-
-      return {
-        folder: folder,
-        allowed_formats: [
-          "jpg",
-          "jpeg",
-          "png",
-          "gif",
-          "webp",
-          "svg",
-          "avif",
-          "bmp",
-          "tiff",
-        ],
-        access_mode: "public",
-        flags: "immutable",
-        quality: "auto",
-        fetch_format: "auto",
-      };
     },
   });
+
+  // Wrap storage to catch upload errors
+  const originalBucket = storage._bucket;
+  if (storage._bucket && typeof storage._bucket === "object") {
+    storage._bucket = {
+      ...originalBucket,
+      _handleFile: async function (req, file, cb) {
+        try {
+          if (typeof originalBucket._handleFile === "function") {
+            const result = await originalBucket._handleFile.call(
+              this,
+              req,
+              file,
+              cb,
+            );
+            return result;
+          } else {
+            logger.warn(
+              `${uploadContext}_CLOUDINARY`,
+              "Original _handleFile not found",
+            );
+            cb(new Error("Storage handler not available"));
+          }
+        } catch (error) {
+          logger.error(
+            `${uploadContext}_CLOUDINARY_UPLOAD`,
+            "Error during file upload",
+            error,
+          );
+          cb(error);
+        }
+      },
+    };
+  }
+
+  return storage;
 };
 
 /**
@@ -229,7 +279,7 @@ const createCloudinaryStorage = (folder = "uploads/images") => {
 
 // Property upload (multiple images + brochure)
 const propertyUpload = multer({
-  storage: createCloudinaryStorage("uploads/properties"),
+  storage: createCloudinaryStorage("FAR/properties"),
   fileFilter: createFileFilter(["image", "pdf"]),
   limits: {
     fileSize: 50 * 1024 * 1024, // 50MB per file
@@ -239,7 +289,7 @@ const propertyUpload = multer({
 
 // Blog upload (single cover image)
 const blogUpload = multer({
-  storage: createCloudinaryStorage("uploads/blogs"),
+  storage: createCloudinaryStorage("FAR/blogs"),
   fileFilter: createFileFilter(["image"]),
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB
@@ -249,7 +299,7 @@ const blogUpload = multer({
 
 // Generic single image upload
 const singleImageUpload = multer({
-  storage: createCloudinaryStorage("uploads/images"),
+  storage: createCloudinaryStorage("FAR/images"),
   fileFilter: createFileFilter(["image"]),
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB
@@ -259,7 +309,7 @@ const singleImageUpload = multer({
 
 // Generic single PDF upload
 const singlePdfUpload = multer({
-  storage: createCloudinaryStorage("uploads/brochures"),
+  storage: createCloudinaryStorage("FAR/brochures"),
   fileFilter: createFileFilter(["pdf"]),
   limits: {
     fileSize: 50 * 1024 * 1024, // 50MB
@@ -269,7 +319,7 @@ const singlePdfUpload = multer({
 
 // Generic multiple files upload
 const multipleFilesUpload = multer({
-  storage: createCloudinaryStorage("uploads/files"),
+  storage: createCloudinaryStorage("FAR/files"),
   fileFilter: createFileFilter(["image", "pdf"]),
   limits: {
     fileSize: 50 * 1024 * 1024, // 50MB per file

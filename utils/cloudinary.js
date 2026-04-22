@@ -5,23 +5,44 @@ const cloudinary = require("../config/cloudinary");
  * LOGGER UTILITY FOR DEBUGGING
  * ============================================
  */
+DISABLE_LOGS = true;
+
 const logger = {
   info: (context, message, data = {}) => {
-    console.log(`[INFO] [${context}] ${message}`, data);
+    // Safely stringify data if it's not a plain object
+    if (DISABLE_LOGS === true) return;
+    const dataStr =
+      data && typeof data === "object" ? JSON.stringify(data, null, 2) : data;
+    console.log(`[INFO] [${context}] ${message}`, dataStr);
   },
   warn: (context, message, data = {}) => {
-    console.warn(`[WARN] [${context}] ${message}`, data);
+    if (DISABLE_LOGS === true) return;
+    const dataStr =
+      data && typeof data === "object" ? JSON.stringify(data, null, 2) : data;
+    console.warn(`[WARN] [${context}] ${message}`, dataStr);
   },
   error: (context, message, error = {}) => {
-    console.error(`[ERROR] [${context}] ${message}`, {
-      message: error.message,
-      stack: error.stack,
-      ...error,
-    });
+    if (DISABLE_LOGS === true) return;
+    // Handle error objects safely
+    const errorObj = {
+      message: error?.message || String(error),
+      stack: error?.stack || "",
+    };
+    // Only add other properties if they exist and aren't already included
+    if (error?.code) errorObj.code = error.code;
+    if (error?.statusCode) errorObj.statusCode = error.statusCode;
+
+    console.error(
+      `[ERROR] [${context}] ${message}`,
+      JSON.stringify(errorObj, null, 2),
+    );
   },
   debug: (context, message, data = {}) => {
+    if (DISABLE_LOGS === true) return;
     if (process.env.DEBUG === "true") {
-      console.log(`[DEBUG] [${context}] ${message}`, data);
+      const dataStr =
+        data && typeof data === "object" ? JSON.stringify(data, null, 2) : data;
+      console.log(`[DEBUG] [${context}] ${message}`, dataStr);
     }
   },
 };

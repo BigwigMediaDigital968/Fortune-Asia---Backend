@@ -153,10 +153,29 @@ exports.addProperty = async (req, res) => {
   } catch (error) {
     logger.error(context, "Error creating property", error);
 
-    res.status(400).json({
+    // Determine error status code based on error type
+    let statusCode = 400;
+    let message = error.message || "Error creating property";
+
+    // Check for specific error types
+    if (error.message?.includes("duplicate") || error.code === 11000) {
+      statusCode = 409;
+      message = "Property with this slug already exists";
+    } else if (error.message?.includes("validation")) {
+      statusCode = 422;
+      message = "Validation error: " + error.message;
+    } else if (error.message?.includes("CloudinaryError")) {
+      statusCode = 500;
+      message = "Error uploading files to Cloudinary";
+    }
+
+    res.status(statusCode).json({
       success: false,
-      message: error.message,
-      error: process.env.NODE_ENV === "development" ? error.stack : undefined,
+      message,
+      ...(process.env.NODE_ENV === "development" && {
+        error: error.message,
+        stack: error.stack,
+      }),
     });
   }
 };
@@ -337,31 +356,67 @@ exports.updateProperty = async (req, res) => {
       updateData.extraHighlights = parseArray(req.body.extraHighlights);
 
     /* 🔥 IMAGE REPLACE - Delete old images and upload new ones */
-    if (req.files?.propertyImages?.length > 0) {
-      logger.info(context, "Replacing property images", {
-        oldImageCount: property.propertyImages.length,
-        newImageCount: req.files.propertyImages.length,
-      });
+    let updatedImages = [];
+    let usedOldImages = [];
 
-      // Delete old images from Cloudinary
-      if (property.propertyImages && property.propertyImages.length > 0) {
-        const deleteResult = await deleteMultipleFromCloudinary(
-          property.propertyImages,
-        );
-        logger.info(context, "Old images deleted", {
-          deleted: deleteResult.deleted.length,
-          failed: deleteResult.failed.length,
+    // ✅ Parse imageOrder from frontend (array of strings: URLs or "FILE:0", "FILE:1", etc.)
+    let imageOrder = [];
+    try {
+      imageOrder = JSON.parse(req.body.imageOrder || "[]");
+      logger.debug(context, "Parsed imageOrder from frontend", { imageOrder });
+    } catch (err) {
+      logger.warn(context, "Invalid imageOrder JSON", { error: err.message });
+    }
+
+    // ✅ Extract newly uploaded files
+    const uploadedImages =
+      req.files?.propertyImages
+        ?.map((file) => file.path || file.secure_url)
+        .filter(Boolean) || [];
+
+    logger.debug(context, "Extracted uploaded images", {
+      uploadedCount: uploadedImages.length,
+    });
+
+    // ✅ Build final image array based on frontend order
+    let newIndex = 0;
+    imageOrder.forEach((item) => {
+      if (item.type === "new") {
+        if (uploadedImages[newIndex]) {
+          updatedImages.push(uploadedImages[newIndex++]);
+        }
+      } else {
+        updatedImages.push(item.url);
+      }
+    });
+
+    // ✅ Find old images to delete (those not in usedOldImages)
+    const oldImages = property.propertyImages || [];
+    const toDelete = oldImages.filter((img) => !usedOldImages.includes(img));
+
+    // ✅ Delete removed images from Cloudinary
+    if (toDelete.length > 0) {
+      try {
+        const deleteResult = await deleteMultipleFromCloudinary(toDelete);
+      } catch (err) {
+        logger.warn(context, "Error deleting old images", {
+          error: err.message,
         });
       }
+    } else {
+      logger.debug(context, "No images to delete");
+    }
 
-      // Extract new image URLs
-      const newImages = req.files.propertyImages
-        .map((file) => file.path || file.secure_url)
-        .filter(Boolean);
+    // ✅ Update propertyImages if imageOrder was provided
+    if (imageOrder.length > 0) {
+      updateData.propertyImages = updatedImages;
 
-      updateData.propertyImages = newImages;
-
-      logger.debug(context, "Images updated", { count: newImages.length });
+      logger.info(context, "Property images updated successfully", {
+        finalCount: updatedImages.length,
+      });
+    } else {
+      // If no imageOrder sent, keep existing images untouched
+      logger.debug(context, "No imageOrder provided, keeping existing images");
     }
 
     /* 🔥 BROCHURE REPLACE - Delete old brochure and upload new one */

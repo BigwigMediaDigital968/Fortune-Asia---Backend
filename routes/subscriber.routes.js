@@ -47,7 +47,7 @@ router.post("/subscribe", async (req, res) => {
 
     res.status(201).json({ success: true, message: "Subscribed successfully" });
   } catch (error) {
-    console.error(error);
+    console.error("❌ Subscription error:", error?.message || error);
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -110,7 +110,7 @@ function generateHtml({ imageUrl, title, content, ctaText, ctaUrl }) {
         `<p style="margin: 0 0 1em; line-height: 1.6;">${paragraph
           .split("\n") // single line breaks
           .map((line) => line.trim())
-          .join("<br>")}</p>`
+          .join("<br>")}</p>`,
     )
     .join("");
 
@@ -271,8 +271,8 @@ router.post("/send-emailer", upload.array("attachments"), async (req, res) => {
       sendToAll === "true"
         ? (await Subscriber.find({})).map((s) => s.email)
         : Array.isArray(emails)
-        ? emails
-        : emails.split(",").map((e) => e.trim());
+          ? emails
+          : emails.split(",").map((e) => e.trim());
 
     if (targetEmails.length === 0) {
       return res.status(404).json({ error: "No recipients found" });
@@ -326,8 +326,5 @@ router.get("/emailer", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
-
-
-
 
 module.exports = router;
