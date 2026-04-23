@@ -12,7 +12,9 @@ const opportunityRoutes = require("./routes/opportunity.routes");
 const notifyRoutes = require("./routes/notify.routes.js");
 const propertyRoutes = require("./routes/property.routes.js");
 const developerRoutes = require("./routes/developer.routes.js");
+const leadRoutes = require("./routes/leads.routes.js");
 const sitemapRoute = require("./routes/sitemap");
+const employeeRoutes = require("./routes/employee.routes.js");
 const app = express();
 
 app.use(express.json());
@@ -27,9 +29,12 @@ app.use("/api/blogs", BlogRoute);
 app.use("/api/listing", listingRoutes);
 app.use("/api/opportunity", opportunityRoutes);
 app.use("/api/notify", notifyRoutes);
+app.use("/api/leads", leadRoutes);
 app.use("/api/property", propertyRoutes);
 app.use("/api/developers", developerRoutes);
 app.use("/", sitemapRoute);
+
+app.use("/api/employees", employeeRoutes);
 
 app.listen(process.env.PORT, async () => {
   try {
