@@ -1,7 +1,13 @@
 const express = require("express");
 const Listing = require("../models/listing.model");
+const { sendEmail } = require("../utils/bravo");
+const {
+  deleteListingReq,
+  getListingReqById,
+  updateListingReqStatus,
+  assignListingReq,
+} = require("../controller/ListingReq.controller");
 const router = express.Router();
-const sendEmail = require("../utils/sendEmail");
 
 /**
  * POST /api/listings
@@ -10,29 +16,29 @@ const sendEmail = require("../utils/sendEmail");
 router.post("/", async (req, res) => {
   const { name, email, phone, address, bedrooms, size, message } = req.body;
 
-  if (!name || !email || !phone || !address || !bedrooms || !size || !message) {
+  if (!name || !email || !phone || !address || !size) {
     return res.status(400).json({ message: "All fields are required." });
   }
 
   try {
     const newListing = new Listing({
-      name,
-      email,
-      phone,
-      address,
-      bedrooms,
-      size,
-      message,
+      name: name,
+      email: email,
+      phone: phone,
+      address: address,
+      bedrooms: bedrooms || null,
+      size: size,
+      message: message || null,
     });
 
     await newListing.save();
 
     // ✅ Send confirmation email
     await sendEmail({
-      to: email,
+      to: [{ email: email, name: name }],
       subject: "Property Listing Received – Mondus",
       text: `Hi ${name},\n\nThank you for listing your property with Mondus.\nOur team will contact you shortly regarding your listing at ${address}.\n\nRegards,\nMondus Team`,
-      html: `
+      htmlContent: `
         <p>Hi <strong>${name}</strong>,</p>
         <p>Thank you for listing your property with <strong>Mondus</strong>.</p>
         <p>We’ve received the following details:</p>
@@ -41,7 +47,7 @@ router.post("/", async (req, res) => {
           <li><strong>Address:</strong> ${address}</li>
           <li><strong>Bedrooms:</strong> ${bedrooms}</li>
           <li><strong>Size:</strong> ${size}</li>
-          
+
         </ul>
         <p>Our team will contact you shortly to assist further.</p>
         <br/>
@@ -69,5 +75,15 @@ router.get("/", async (req, res) => {
     res.status(500).json({ message: "Server error." });
   }
 });
+
+router.get("/:id", getListingReqById);
+
+// Update Lead Status
+router.patch("/:id/status", updateListingReqStatus);
+
+// Assign Lead to User
+router.patch("/:id/assign", assignListingReq);
+
+router.delete("/:id", deleteListingReq);
 
 module.exports = router;

@@ -20,6 +20,7 @@
   },
   "homepage": "https://github.com/BigwigMediaAI/Mondus_Bakend#readme",
   "dependencies": {
+    "@getbrevo/brevo": "^5.0.4",
     "axios": "^1.9.0",
     "cloudinary": "^1.41.3",
     "cors": "^2.8.5",
