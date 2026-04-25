@@ -19,7 +19,6 @@ const validateCreateInput = (body) => {
 
   if (!body.name?.trim()) errors.push("Developer name is required");
   if (!body.slug?.trim()) errors.push("Slug is required");
-  if (!body.logo?.trim()) errors.push("Logo URL is required");
   if (!body.shortDescription?.trim()) errors.push("Short description is required");
 
   if (body.shortDescription && body.shortDescription.length > 300) {
@@ -36,12 +35,11 @@ const prepareDeveloperData = async (body, files, isUpdate = false, existingDevel
   const data = {
     name: body.name?.trim(),
     slug: body.slug?.trim().toLowerCase(),
-    logo: body.logo?.trim(),
     shortDescription: body.shortDescription?.trim(),
   };
 
   // Optional fields
-  if (body.coverImage) data.coverImage = body.coverImage.trim();
+  //if (body.coverImage) data.coverImage = body.coverImage.trim();
   if (body.fullDescription) data.fullDescription = body.fullDescription;
   if (body.website) data.website = body.website.trim();
 
@@ -160,6 +158,9 @@ const prepareDeveloperData = async (body, files, isUpdate = false, existingDevel
         error: err.message,
       });
     }
+  }
+  if(body.coverImage) {
+    data.coverImage = newImages[0];
   }
   data.images = newImages;
 
