@@ -307,6 +307,15 @@ const singleImageUpload = multer({
   },
 });
 
+const blogContentUplold = multer({
+  storage: createCloudinaryStorage("FAR/blogs/content"),
+  fileFilter: createFileFilter(["image"]),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB
+    files: 1,
+  },
+});
+
 // Generic single PDF upload
 const singlePdfUpload = multer({
   storage: createCloudinaryStorage("FAR/brochures"),
@@ -334,6 +343,7 @@ module.exports = {
   singleImageUpload,
   singlePdfUpload,
   multipleFilesUpload,
+  blogContentUplold,
 
   // Utilities
   createFileFilter,

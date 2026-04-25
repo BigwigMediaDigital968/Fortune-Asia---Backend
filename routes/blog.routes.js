@@ -7,7 +7,7 @@ const {
   getBlogBySlug,
 } = require("../controller/Blog.controller");
 
-const { blogUpload } = require("../middleware/upload");
+const { blogUpload, blogContentUplold } = require("../middleware/upload");
 
 /**
  * ============================================
@@ -29,5 +29,28 @@ router.put("/:slug", blogUpload.single("coverImage"), updateBlogPostBySlug);
 
 // DELETE BLOG
 router.delete("/:slug", deleteBlogPostBySlug);
+
+router.post('/upload/image', blogContentUplold.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'No file uploaded',
+      });
+    }
+
+    res.json({
+      success: true,
+      url: req.file.path, // Cloudinary URL
+      public_id: req.file.filename,
+    });
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Upload failed',
+    });
+  }
+});
 
 module.exports = router;
