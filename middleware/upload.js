@@ -185,7 +185,7 @@ const createCloudinaryStorage = (folder = "FAR/images") => {
           });
 
           const params = {
-            folder: "FAR/properties/brochures",
+            folder: folder,
             resource_type: "raw", // IMPORTANT for pdf
             type: "upload",
             format: "pdf",
@@ -287,6 +287,16 @@ const propertyUpload = multer({
   },
 });
 
+// Developer upload (multiple images + brochure)
+  const developerUpload = multer({
+    storage: createCloudinaryStorage("FAR/developers"),
+    fileFilter: createFileFilter(["image", "pdf"]),
+    limits: {
+      fileSize: 50 * 1024 * 1024, // 50MB per file
+      files: 11, // 10 images + 1 brochure
+    },
+  });
+
 // Blog upload (single cover image)
 const blogUpload = multer({
   storage: createCloudinaryStorage("FAR/blogs"),
@@ -344,7 +354,7 @@ module.exports = {
   singlePdfUpload,
   multipleFilesUpload,
   blogContentUplold,
-
+  developerUpload,
   // Utilities
   createFileFilter,
   createCloudinaryStorage,
