@@ -113,11 +113,17 @@ exports.addProperty = async (req, res) => {
 
     /* 🔥 PREPARE PROPERTY DATA */
     const propertyData = {
-      ...req.body,
-      slug,
+      propertyName: req.body.propertyName?.trim(),
+      developer: req.body.developer || null,
+      listingType: req.body.listingType?.trim().toLowerCase(),
+      propertyType: req.body.propertyType?.trim().toLowerCase(),
+      address: req.body.address?.trim(),
+      subArea: req.body.subArea?.trim(),
+      slug: req.body.slug?.trim() || slug,
+      developerName: req.body.developer || null,
 
       /* NUMBERS */
-      price: Number(req.body.price),
+      price: req.body.price || 0,
       bedroom: Number(req.body.bedroom || 0),
       bathroom: Number(req.body.bathroom || 0),
       sizeSqft: req.body.sizeSqft?.trim() || "",
@@ -227,9 +233,11 @@ exports.getProperties = async (req, res) => {
 
     logger.debug(context, "Fetching properties with filter", { filter });
 
-    const properties = await PropertyListing.find(filter).sort({
-      createdAt: -1,
-    });
+    const properties = await PropertyListing.find(filter)
+      .sort({
+        createdAt: -1,
+      })
+      .populate("developer", "name logo");
 
     logger.info(context, "Properties fetched successfully", {
       count: properties.length,
@@ -266,10 +274,12 @@ exports.getSingleProperty = async (req, res) => {
 
     if (idOrSlug.match(/^[0-9a-fA-F]{24}$/)) {
       // Valid Mongo ObjectId
-      property = await PropertyListing.findById(idOrSlug);
+      property = await PropertyListing.findById(idOrSlug).populate("developer");
     } else {
       // Slug
-      property = await PropertyListing.findOne({ slug: idOrSlug });
+      property = await PropertyListing.findOne({ slug: idOrSlug }).populate(
+        "developer",
+      );
     }
 
     if (!property) {
@@ -336,9 +346,15 @@ exports.updateProperty = async (req, res) => {
 
     /* 🔥 PREPARE UPDATE DATA */
     const updateData = {
-      ...req.body,
-      slug,
-      price: req.body.price && Number(req.body.price),
+      propertyName: req.body.propertyName?.trim(),
+      developer: req.body.developer || null,
+      listingType: req.body.listingType?.trim().toLowerCase(),
+      propertyType: req.body.propertyType?.trim().toLowerCase(),
+      address: req.body.address?.trim(),
+      subArea: req.body.subArea?.trim(),
+      slug: req.body.slug?.trim() || slug,
+      developerName: req.body.developer || null,
+      price: req.body.price && req.body.price,
       bedroom: req.body.bedroom && Number(req.body.bedroom),
       bathroom: req.body.bathroom && Number(req.body.bathroom),
       sizeSqft: req.body.sizeSqft && req.body.sizeSqft.trim(),
@@ -392,7 +408,7 @@ exports.updateProperty = async (req, res) => {
 
     // ✅ Find old images to delete (those not in usedOldImages)
     const oldImages = property.propertyImages || [];
-    const toDelete = oldImages.filter((img) => !usedOldImages.includes(img));
+    const toDelete = oldImages.filter((img) => !updatedImages.includes(img));
 
     // ✅ Delete removed images from Cloudinary
     if (toDelete.length > 0) {

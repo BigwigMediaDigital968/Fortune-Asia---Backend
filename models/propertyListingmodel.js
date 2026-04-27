@@ -1,5 +1,7 @@
 const mongoose = require("mongoose");
 
+const { Schema } = mongoose;
+
 const propertyListingSchema = new mongoose.Schema(
   {
     propertyName: { type: String, required: true },
@@ -14,7 +16,7 @@ const propertyListingSchema = new mongoose.Schema(
     propertyType: { type: String, required: true },
 
     price: {
-      type: Number,
+      type: String,
       required: true,
     },
 
@@ -30,7 +32,11 @@ const propertyListingSchema = new mongoose.Schema(
       default: null,
     },
 
-    developerName: { type: String, required: true },
+    developer: {
+      type: Schema.Types.ObjectId,
+      ref: "Developer",
+      default: null,
+    },
 
     propertyImages: [
       {
