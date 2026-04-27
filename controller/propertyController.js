@@ -121,11 +121,12 @@ exports.addProperty = async (req, res) => {
       subArea: req.body.subArea?.trim(),
       slug: req.body.slug?.trim() || slug,
       developerName: req.body.developer || null,
+      isFeatured: req.body.isFeatured || false,
 
       /* NUMBERS */
       price: req.body.price || 0,
-      bedroom: Number(req.body.bedroom || 0),
-      bathroom: Number(req.body.bathroom || 0),
+      bedroom: req.body.bedroom || null,
+      bathroom: req.body.bathroom || null,
       sizeSqft: req.body.sizeSqft?.trim() || "",
 
       /* ARRAYS */
@@ -205,17 +206,25 @@ exports.getProperties = async (req, res) => {
       maxPrice,
       status,
       developerName,
+      isFeatured,
+      page = 1,
+      limit = 10,
     } = req.query;
 
     const filter = {};
 
+    const pageNum = Math.max(Number(page) || 1, 1);
+    const limitNum = Math.max(Number(limit) || 10, 1);
+    const skip = (pageNum - 1) * limitNum;
+
     if (listingType) filter.listingType = listingType;
     if (propertyType) filter.propertyType = propertyType;
     if (developerName) filter.developerName = developerName;
-    if (bedroom) filter.bedroom = Number(bedroom);
-    if (bathroom) filter.bathroom = Number(bathroom);
+    if (bedroom) filter.bedroom = bedroom;
+    if (bathroom) filter.bathroom = bathroom;
     if (subArea) filter.subArea = subArea;
     if (status !== undefined) filter.status = status === "true";
+    if (isFeatured !== undefined) filter.isFeatured = isFeatured === "true";
 
     /* PRICE FILTER */
     if (minPrice || maxPrice) {
@@ -233,11 +242,15 @@ exports.getProperties = async (req, res) => {
 
     logger.debug(context, "Fetching properties with filter", { filter });
 
-    const properties = await PropertyListing.find(filter)
-      .sort({
-        createdAt: -1,
-      })
-      .populate("developer", "name logo");
+    const [properties, total] = await Promise.all([
+      PropertyListing.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .populate("developer", "name logo"),
+
+      PropertyListing.countDocuments(filter),
+    ]);
 
     logger.info(context, "Properties fetched successfully", {
       count: properties.length,
@@ -246,6 +259,9 @@ exports.getProperties = async (req, res) => {
     res.status(200).json({
       success: true,
       count: properties.length,
+      total,
+      page: pageNum,
+      totalPages: Math.ceil(total / limitNum),
       data: properties,
     });
   } catch (error) {
@@ -355,11 +371,12 @@ exports.updateProperty = async (req, res) => {
       slug: req.body.slug?.trim() || slug,
       developerName: req.body.developer || null,
       price: req.body.price && req.body.price,
-      bedroom: req.body.bedroom && Number(req.body.bedroom),
-      bathroom: req.body.bathroom && Number(req.body.bathroom),
+      bedroom: req.body.bedroom || null,
+      bathroom: req.body.bathroom || null,
       sizeSqft: req.body.sizeSqft && req.body.sizeSqft.trim(),
       videoLink: req.body.videoLink?.trim() || null,
       googleMapUrl: req.body.googleMapUrl?.trim() || null,
+      isFeatured: req.body.isFeatured || false,
     };
 
     /* ARRAY UPDATES */

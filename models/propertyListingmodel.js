@@ -9,7 +9,7 @@ const propertyListingSchema = new mongoose.Schema(
 
     listingType: {
       type: String,
-      enum: ["buy", "rent"],
+      enum: ["buy", "rent", "lease", "sale"],
       required: true,
     },
 
@@ -19,9 +19,13 @@ const propertyListingSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    isFeatured: {
+      type: Boolean,
+      default: false,
+    },
 
-    bedroom: { type: Number, required: true },
-    bathroom: { type: Number, required: true },
+    bedroom: { type: String, required: true, default: null },
+    bathroom: { type: String, required: true, default: null },
     sizeSqft: { type: String, required: true },
 
     address: { type: String, required: true },

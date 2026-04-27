@@ -187,20 +187,20 @@ exports.getBlogBySlug = async (req, res) => {
     if (!blog) {
       logger.debug(context, "Slug not found, checking slug history");
 
-      const oldBlog = await BlogPost.findOne({ slugHistory: slug }).lean();
+      // const oldBlog = await BlogPost.findOne({ slugHistory: slug }).lean();
 
-      if (oldBlog) {
-        logger.info(context, "Found blog with old slug, redirecting", {
-          oldSlug: slug,
-          newSlug: oldBlog.slug,
-        });
+      // if (oldBlog) {
+      //   logger.info(context, "Found blog with old slug, redirecting", {
+      //     oldSlug: slug,
+      //     newSlug: oldBlog.slug,
+      //   });
 
-        return res.status(200).json({
-          success: true,
-          redirect: true,
-          newSlug: oldBlog.slug,
-        });
-      }
+      //   return res.status(200).json({
+      //     success: true,
+      //     redirect: true,
+      //     newSlug: oldBlog.slug,
+      //   });
+      // }
 
       logger.warn(context, "Blog not found", { slug });
       return res.status(404).json({
