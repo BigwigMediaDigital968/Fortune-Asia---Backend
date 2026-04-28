@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const developerController = require("../controller/developer.controller.js");
+const developerController = require("../controller/Developer.controller");
 const { developerUpload } = require("../middleware/upload");
 
 // You can add authentication middleware here
