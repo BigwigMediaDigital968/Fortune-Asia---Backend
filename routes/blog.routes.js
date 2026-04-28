@@ -5,6 +5,7 @@ const {
   updateBlogPostBySlug,
   deleteBlogPostBySlug,
   getBlogBySlug,
+  getRelatedBlogs,
 } = require("../controller/Blog.controller");
 
 const { blogUpload, blogContentUplold } = require("../middleware/upload");
@@ -23,6 +24,9 @@ router.get("/", getBlog);
 
 // GET BLOG BY SLUG
 router.get("/:slug", getBlogBySlug);
+
+// GET RELATED BLOGS
+router.get("/related/:slug", getRelatedBlogs);
 
 // UPDATE BLOG (with optional cover image)
 router.put("/:slug", blogUpload.single("coverImage"), updateBlogPostBySlug);

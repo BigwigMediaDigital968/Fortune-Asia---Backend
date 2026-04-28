@@ -428,3 +428,53 @@ exports.deleteBlogPostBySlug = async (req, res) => {
     });
   }
 };
+
+/**
+ * ================== GET RELATED BLOGS ==================
+ */
+exports.getRelatedBlogs = async (req, res) => {
+  const context = `${controllerContext}_GET_RELATED`;
+  const { slug } = req.params;
+
+  try {
+    logger.info(context, "Fetching related blogs", { slug });
+
+    // Find the current blog
+    const currentBlog = await BlogPost.findOne({ slug }).lean();
+    if (!currentBlog) {
+      logger.warn(context, "Blog not found", { slug });
+      return res.status(404).json({
+        success: false,
+        error: "Blog not found.",
+      });
+    }
+
+    // Get related blogs by matching tags
+    const relatedBlogs = await BlogPost.find({
+      _id: { $ne: currentBlog._id },
+      tags: { $in: currentBlog.tags },
+    })
+      .sort({ datePublished: -1 })
+      .limit(5)
+      .lean();
+
+    logger.info(context, "Related blogs fetched successfully", {
+      count: relatedBlogs.length,
+    });
+
+    res.status(200).json({
+      success: true,
+      count: relatedBlogs.length,
+      data: relatedBlogs,
+    });
+  } catch (error) {
+    logger.error(context, "Error fetching related blogs", error);
+
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch related blogs.",
+      details:
+        process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+};
