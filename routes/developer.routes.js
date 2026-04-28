@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const developerController = require("../controller/developer.controller");
+const developerController = require("../controller/developer.controller.js");
 const { developerUpload } = require("../middleware/upload");
 
 // You can add authentication middleware here
@@ -50,9 +50,9 @@ router.post(
   developerUpload.fields([
     { name: "images", maxCount: 10 },
     { name: "brochure", maxCount: 1 },
-    {name: "logo", maxCount: 1}
+    { name: "logo", maxCount: 1 },
   ]),
-  developerController.createDeveloper
+  developerController.createDeveloper,
 );
 
 /**
@@ -67,9 +67,9 @@ router.put(
   developerUpload.fields([
     { name: "images", maxCount: 10 },
     { name: "brochure", maxCount: 1 },
-    {name: "logo", maxCount: 1}
+    { name: "logo", maxCount: 1 },
   ]),
-  developerController.updateDeveloper
+  developerController.updateDeveloper,
 );
 
 /**
@@ -81,7 +81,7 @@ router.patch(
   "/:id/toggle-featured",
   // authenticate,
   // authorize("admin"),
-  developerController.toggleFeatured
+  developerController.toggleFeatured,
 );
 
 /**
@@ -93,7 +93,7 @@ router.patch(
   "/:id/toggle-active",
   // authenticate,
   // authorize("admin"),
-  developerController.toggleActive
+  developerController.toggleActive,
 );
 
 /**
@@ -106,7 +106,7 @@ router.patch(
   "/:id/projects",
   // authenticate,
   // authorize("admin"),
-  developerController.addProject
+  developerController.addProject,
 );
 
 /**
@@ -118,7 +118,7 @@ router.delete(
   "/:id/projects/:projectId",
   // authenticate,
   // authorize("admin"),
-  developerController.removeProject
+  developerController.removeProject,
 );
 
 /**
@@ -130,7 +130,7 @@ router.delete(
   "/:id",
   // authenticate,
   // authorize("admin"),
-  developerController.deleteDeveloper
+  developerController.deleteDeveloper,
 );
 
 module.exports = router;
