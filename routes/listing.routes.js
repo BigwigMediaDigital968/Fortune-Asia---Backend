@@ -36,11 +36,11 @@ router.post("/", async (req, res) => {
     // ✅ Send confirmation email
     await sendEmail({
       to: [{ email: email, name: name }],
-      subject: "Property Listing Received – Mondus",
-      text: `Hi ${name},\n\nThank you for listing your property with Mondus.\nOur team will contact you shortly regarding your listing at ${address}.\n\nRegards,\nMondus Team`,
+      subject: "Property Listing Received – Fortune Asia",
+      text: `Hi ${name},\n\nThank you for listing your property with Fortune Asia.\nOur team will contact you shortly regarding your listing at ${address}.\n\nRegards,\nFortune Asia Team`,
       htmlContent: `
         <p>Hi <strong>${name}</strong>,</p>
-        <p>Thank you for listing your property with <strong>Mondus</strong>.</p>
+        <p>Thank you for listing your property with <strong>Fortune Asia</strong>.</p>
         <p>We’ve received the following details:</p>
         <ul>
           <li><strong>Phone:</strong> ${phone}</li>
@@ -51,7 +51,7 @@ router.post("/", async (req, res) => {
         </ul>
         <p>Our team will contact you shortly to assist further.</p>
         <br/>
-        <p>Regards,<br/><strong>Mondus Team</strong></p>
+        <p>Regards,<br/><strong>Fortune Asia Team</strong></p>
       `,
     });
 
