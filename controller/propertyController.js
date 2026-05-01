@@ -122,6 +122,7 @@ exports.addProperty = async (req, res) => {
       slug: req.body.slug?.trim() || slug,
       developerName: req.body.developer || null,
       isFeatured: req.body.isFeatured || false,
+      propertyDetails: req.body.propertyDetails?.trim(),
 
       /* NUMBERS */
       price: req.body.price || 0,

@@ -24,9 +24,9 @@ const propertyListingSchema = new mongoose.Schema(
       default: false,
     },
 
-    bedroom: { type: String, required: true, default: null },
-    bathroom: { type: String, required: true, default: null },
-    sizeSqft: { type: String, required: true },
+    bedroom: { type: String, default: null },
+    bathroom: { type: String, default: null },
+    sizeSqft: { type: String, default: null },
 
     address: { type: String, required: true },
     subArea: { type: String },
