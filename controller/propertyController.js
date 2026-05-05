@@ -221,8 +221,8 @@ exports.getProperties = async (req, res) => {
     if (listingType) filter.listingType = listingType;
     if (propertyType) filter.propertyType = propertyType;
     if (developerName) filter.developerName = developerName;
-    if (bedroom) filter.bedroom = bedroom;
-    if (bathroom) filter.bathroom = bathroom;
+    if (bedroom) filter.bedroom = { $regex: `\\b${bedroom}\\b`, $options: "i" };;
+    if (bathroom) filter.bathroom = { $regex: `\\b${bathroom}\\b`, $options: "i" };
     if (subArea) filter.subArea = subArea;
     if (status !== undefined) filter.status = status === "true";
     if (isFeatured !== undefined) filter.isFeatured = isFeatured === "true";
