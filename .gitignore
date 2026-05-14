@@ -3,6 +3,8 @@
 node_modules/
 jspm_packages/
 
+google-api-file.json
+
 # ── SECRETS & CONFIG ──
 # Local environment variables containing sensitive keys/passwords
 .env

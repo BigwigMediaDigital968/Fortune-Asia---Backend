@@ -1,3 +1,6 @@
+const {
+  appendLeadToEmployeeSheet,
+} = require("../services/sheetsService.js");
 const mongoose = require("mongoose");
 const Employee = require("../models/Employee.model");
 const Lead = require("../models/lead.model");
@@ -149,41 +152,136 @@ exports.updateLeadStatus = async (req, res) => {
   }
 };
 
+
 /* --------------------------------------------------
    ASSIGN LEAD
 ---------------------------------------------------*/
+
+
+
+function formatIndianDate(date) {
+  const d = new Date(date);
+
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+
+  let hours = d.getHours();
+  const mins = String(d.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  const hh = String(hours).padStart(2, '0');
+
+  return `${day}/${month}/${year} ${hh}:${mins} ${ampm}`;
+}
+
+const prepareLeadRow = (lead) => [
+  formatIndianDate(lead.createdAt),             // from timestamps: true
+  formatIndianDate(lead.assignedAt || new Date()),
+  lead.name || '',
+  lead.phone || '',
+  lead.email || '',
+  lead.city || '',
+  lead.purpose || '',
+  lead.adminNote || '',
+  lead.source || 'website',
+];
+
+// export const assignLead = async (req, res) => {
+//     try {
+//         const { employeeId } = req.body;
+//         const { id } = req.params;
+
+//         if (!employeeId || !id) {
+//             return res.status(400).json({ success: false, message: "Employee ID and Lead ID are required" });
+//         }
+
+//         validateObjectId(id);
+//         validateObjectId(employeeId);
+
+//         const employee = await Employee.findById(employeeId);
+//         if (!employee || !employee.isActive) {
+//             return res.status(404).json({ success: false, message: "Employee not found or inactive" });
+//         }
+
+//         // ✅ Fetch lead BEFORE using it
+//         const lead = await Lead.findById(id).populate("assignedTo", "name email phone");
+//         if (!lead) {
+//             return res.status(404).json({ success: false, message: "Lead not found" });
+//         }
+
+//         const rowData = prepareLeadRow(lead);
+
+//         lead.assignedTo  = employeeId;
+//         lead.assignedAt  = new Date();
+//         lead.status      = "assigned";
+//         lead.sheetSynced = true;
+
+//         // employee.sheetId stores the full URL — already handled by getSheetIdFromUrl
+//         await appendLeadToEmployeeSheet(employee.sheetId, rowData);
+
+//         await lead.save();
+
+//         return res.json({ success: true, message: "Lead assigned successfully", data: lead });
+
+//     } catch (error) {
+//         console.error("Assign Lead Error:", error);
+//         if (error.message === "Invalid ID format") {
+//             return res.status(400).json({ success: false, message: error.message });
+//         }
+//         res.status(500).json({ success: false, message: "Assignment failed" });
+//     }
+// };
+
+
 exports.assignLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { userId } = req.body;
+    const { employeeId } = req.body;
 
-    if (!isValidId(id) || !isValidId(userId)) {
+    if (!isValidId(id) || !isValidId(employeeId)) {
       return res.status(400).json({ message: "Invalid ID" });
     }
 
-    const lead = await Lead.findByIdAndUpdate(
-      id,
-      {
-        assignedTo: userId,
-        status: "assigned",
-      },
-      { new: true },
-    );
-
-    if (!lead) {
-      return res.status(404).json({ message: "Lead not found" });
+    const employee = await Employee.findById(employeeId);
+    if (!employee || !employee.isActive) {
+      return res.status(404).json({ success: false, message: "Employee not found or inactive" });
     }
 
-    res.status(200).json({
-      success: true,
-      data: lead,
-    });
+    // ✅ Fetch lead BEFORE using it
+    const lead = await Lead.findById(id).populate("assignedTo", "name email phone");
+    if (!lead) {
+      return res.status(404).json({ success: false, message: "Lead not found" });
+    }
+
+    const rowData = prepareLeadRow(lead);
+
+    lead.assignedTo = employeeId;
+    lead.assignedAt = new Date();
+    lead.status = "assigned";
+    lead.sheetSynced = true;
+
+    // employee.sheetId stores the full URL — already handled by getSheetIdFromUrl
+    console.log("here")
+    await appendLeadToEmployeeSheet(employee.sheetId, rowData);
+    console.log("here2")
+
+    await lead.save();
+
+    return res.status(200).json({ success: true, message: "Lead assigned successfully", data: lead });
   } catch (error) {
+    console.log("here3")
+    console.log(error.message)
+
     console.error("Assign Lead Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to assign lead",
-    });
+    if (error.message === "Invalid ID format") {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    if (error && error.code == 403) {
+      return res.status(403).json({ success: false, message: error.message });
+    }
+    res.status(500).json({ success: false, message: "Assignment failed" });
   }
 };
 

@@ -48,6 +48,14 @@ const leadSchema = new Schema(
       default: null,
     },
 
+    assignedAt: Date,
+
+    // 🔥 External sync tracking
+    sheetSynced: {
+      type: Boolean,
+      default: false,
+    },
+
     // Lead Status
     status: {
       type: String,
@@ -61,6 +69,10 @@ const leadSchema = new Schema(
         "lost",
       ],
       default: "new",
+    },
+    adminNote: {
+      type: String,
+      default: "",
     },
 
     notes: {
