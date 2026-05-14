@@ -172,7 +172,9 @@ function formatIndianDate(date) {
   hours = hours % 12 || 12;
   const hh = String(hours).padStart(2, '0');
 
-  return `${day}/${month}/${year} ${hh}:${mins} ${ampm}`;
+    // return `${day}/${month}/${year} ${hh}:${mins} ${ampm}`;
+
+  return `${day}/${month}/${year}`;
 }
 
 const prepareLeadRow = (lead) => [
