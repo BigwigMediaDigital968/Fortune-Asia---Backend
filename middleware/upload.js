@@ -283,7 +283,7 @@ const propertyUpload = multer({
   fileFilter: createFileFilter(["image", "pdf"]),
   limits: {
     fileSize: 50 * 1024 * 1024, // 50MB per file
-    files: 11, // 10 images + 1 brochure
+    files: 21, // 10 images + 1 brochure
   },
 });
 
