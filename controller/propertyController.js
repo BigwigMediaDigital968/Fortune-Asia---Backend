@@ -72,7 +72,6 @@ exports.addProperty = async (req, res) => {
       "propertyType",
       "address",
       "propertyDetails",
-      "price",
     ];
 
     const missingFields = requiredFields.filter(

@@ -17,7 +17,7 @@ const propertyListingSchema = new mongoose.Schema(
 
     price: {
       type: String,
-      required: true,
+      default: 0,
     },
     isFeatured: {
       type: Boolean,
